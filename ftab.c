@@ -29,6 +29,8 @@
 #include <unistd.h>
 #endif
 
+typedef uint8_t u8;
+typedef uint64_t u64;
 
 /* Count the number of newlines in a file */
 static size_t count_newlines(const char * fname)
@@ -259,6 +261,7 @@ parse_col_names(ftab_t * T,
     T->colnames = calloc(ncol, sizeof(char*));
     assert(T->colnames != NULL);
 
+    char * line0 = line;
     /* Set columns */
     for(int kk = 0; kk<ncol; kk++)
     {
@@ -278,7 +281,7 @@ parse_col_names(ftab_t * T,
         printf("\n");
     }
     //   exit(EXIT_FAILURE);
-    free(line);
+    free(line0);
 
     return ncol;
 }
@@ -523,6 +526,37 @@ int ftab_set_coldata(ftab_t * T, int col, const float * data)
 }
 
 
+ftab_t * ftab_copy(const ftab_t * T)
+{
+    ftab_t * C = calloc(1, sizeof(ftab_t));
+    assert(C != NULL);
+    C->nrow = T->nrow;
+    C->ncol = T->ncol;
+    C->nrow_alloc = C->nrow;
+    C->T = calloc(C->nrow*C->ncol, sizeof(float));
+    if(C->T == NULL)
+    {
+        return NULL;
+    }
+
+    memcpy(C->T, T->T, C->nrow*C->ncol*sizeof(float));
+
+    if(T->colnames != NULL)
+    {
+        C->colnames = calloc(C->ncol, sizeof(char*));
+        assert(C->colnames != NULL);
+        for(u64 kk = 0; kk < C->ncol; kk++)
+        {
+            if(T->colnames[kk] != NULL)
+            {
+                C->colnames[kk] = strdup(T->colnames[kk]);
+                // TODO: gracefully tear down if NULL was returned.
+            }
+        }
+    }
+    return C;
+}
+
 ftab_t * ftab_concatenate_columns(const ftab_t * L , const ftab_t * R)
 {
     if(L->nrow != R->nrow)
@@ -570,6 +604,75 @@ ftab_t * ftab_concatenate_columns(const ftab_t * L , const ftab_t * R)
         }
     }
 
+    return T;
+}
+
+ftab_t *
+ftab_concatenate_rows(const ftab_t * Top, const ftab_t * Down)
+{
+
+    if(Top == NULL && Down == NULL)
+    {
+        return NULL;
+    }
+    if(Top == NULL)
+    {
+        return ftab_copy(Down);
+    }
+    if(Down == NULL)
+    {
+        return ftab_copy(Top);
+    }
+
+    if(Top->ncol != Down->ncol)
+    {
+        fprintf(stderr,
+                "ftab concatenate_rows: error: Tables does "
+                "not have the same number of columns\n");
+        return NULL;
+    }
+    // TODO: Check column names
+
+    ftab_t * concat = calloc(1, sizeof(ftab_t));
+    assert(concat != NULL);
+    concat->ncol = Top->ncol;
+    concat->nrow = Top->nrow + Down->nrow;
+    concat->nrow_alloc = concat->nrow;
+    concat->T = calloc(concat->nrow*concat->ncol, sizeof(float));
+    if(concat->T == NULL)
+    {
+        free(concat);
+        return NULL;
+    }
+    memcpy(concat->T,
+           Top->T,
+           Top->nrow*Top->ncol*sizeof(float));
+    memcpy(concat->T+Top->nrow*Top->ncol,
+           Down->T,
+           Down->nrow*Down->ncol*sizeof(float));
+
+    // TODO: Set column names
+    return concat;
+}
+
+ftab_t *
+ftab_new_from_data(int nrow, int ncol, const float * data)
+{
+    ftab_t * T = calloc(1, sizeof(ftab_t));
+    if(T == NULL)
+    {
+        return T;
+    }
+    T->ncol = ncol;
+    T->nrow = nrow;
+    T->nrow_alloc = T->nrow;
+    T->T = calloc(nrow*ncol, sizeof(float));
+    if(T->T == NULL)
+    {
+        free(T);
+        return NULL;
+    }
+    memcpy(T->T, data, nrow*ncol*sizeof(float));
     return T;
 }
 
@@ -638,4 +741,25 @@ int ftab_ut(int argc, char ** argv)
     }
 
     return EXIT_SUCCESS;
+}
+
+void
+ftab_subselect_rows(ftab_t * tab, const u8 * selection)
+{
+    u64 nsel = 0;
+    for(u64 kk = 0; kk < tab->nrow; kk++)
+    {
+        if(selection[kk] > 0)
+        {
+            if(kk != nsel)
+            {
+                memcpy(tab->T + nsel*tab->ncol,
+                       tab->T + kk*tab->ncol,
+                       tab->ncol*sizeof(float));
+            }
+            nsel++;
+        }
+    }
+    tab->nrow = nsel;
+    return;
 }
