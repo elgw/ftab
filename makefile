@@ -1,6 +1,6 @@
 CC=gcc -std=gnu99
 
-CFLAGS=-Wall -Wextra
+CFLAGS=-Wall -Wextra -pedantic
 
 ASAN?=0
 ifeq ($(ASAN),1)

@@ -21,6 +21,7 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -80,7 +81,7 @@ trim_whitespace(char * str)
 
     // Look for whitespaces from the end
     char * end = str+n-1;
-    while(end != str)
+    while(end >= start)
     {
         char token = end[0];
         int ws = 0;
@@ -314,7 +315,7 @@ parse_floats(char * l,
              int nval,
              const char * dlm)
 {
-    char * f = strtok(l, dlm);
+    char * f = strsep(&l, dlm);
     if(f == NULL)
     {
         return 0;
@@ -323,7 +324,7 @@ parse_floats(char * l,
     row[0] = atof(f);
     for(int kk = 1; kk<nval; kk++)
     {
-        f = strtok(NULL, dlm);
+        f = strsep(&l, dlm);
         //      printf("%d: %s\n", kk, f);
         if(f == NULL)
         {
@@ -676,9 +677,141 @@ ftab_new_from_data(int nrow, int ncol, const float * data)
     return T;
 }
 
+char * tempfilename()
+{
+    char * fname = calloc(1024, 1);
+    assert(fname != NULL);
+#ifdef WINDOWS
+    printf("TODO: Windows functionality\n");
+    sprintf(fname, "ftab-random");
+#else
+    sprintf(fname, "/tmp/ftab-XXXXXX");
+    int filedes = mkstemp(fname);
+    close(filedes);
+#endif
+    return fname;
+}
+
+int ftab_compare(const ftab_t * A, const ftab_t * B)
+{
+    if(A == NULL)
+    {
+        return 1;
+    }
+    if(B == NULL)
+    {
+        return 1;
+    }
+    if(A->ncol != B->ncol)
+    {
+        return 1;
+    }
+    if(A->nrow != B->nrow)
+    {
+        return 1;
+    }
+
+    int equal_colnames = 1;
+    if(A->colnames == NULL)
+    {
+        if(B->colnames != NULL)
+        {
+            equal_colnames = 0;
+        }
+
+    }
+    if(B->colnames == NULL)
+    {
+        if(A->colnames != NULL)
+        {
+            equal_colnames = 0;
+        }
+    }
+    if(A->colnames != NULL && B->colnames != NULL)
+    {
+        for(size_t kk = 0; kk<A->ncol; kk++)
+        {
+             if(strcmp(A->colnames[kk], A->colnames[kk]))
+             {
+                 equal_colnames = 0;
+            }
+        }
+    }
+    if(equal_colnames == 0)
+    {
+        return 1;
+    }
+
+    if(A->nrow == 0 || A->nrow == 0)
+    {
+        return 0;
+    }
+    // Compare data
+    return memcmp(A->T, B->T, A->ncol*A->nrow*sizeof(float));
+}
 
 int ftab_ut(int argc, char ** argv)
 {
+    if(argc == 1)
+    {
+        printf("Running some self tests.\n");
+        printf("To test on a specific file, use:\n");
+        printf("%s file.csv\n", argv[1]);
+        printf("\n");
+    }
+    if(argc > 1)
+    {
+        printf("Reading %s as CSV\n", argv[1]);
+        ftab_t * T = ftab_from_csv(argv[1]);
+        printf("\n");
+        if(T == NULL)
+        {
+            printf("Unable to read the file\n");
+            return EXIT_FAILURE;
+        }
+        printf("Table size: %lu x %lu\n", T->nrow, T->ncol);
+        if(T->colnames != NULL)
+        {
+            printf("Columns names\n");
+            for(int kk = 0; kk < (int) T->ncol; kk++)
+            {
+                printf("%2d '%s'\n", kk+1, T->colnames[kk]);
+            }
+        }
+        if(T->nrow > 0)
+        {
+            printf("First row:\n");
+            for(int kk = 0; kk < (int) T->ncol; kk++)
+            {
+                printf("%f\t", T->T[kk]);
+            }
+            printf("\n");
+        }
+
+        char * fname = tempfilename();
+        printf("Temporary file: %s\n", fname);
+        ftab_write_tsv(T, fname);
+
+
+        ftab_t * T2 = ftab_from_tsv(fname);
+#ifndef WINDOWS
+        unlink(fname);
+#endif
+        free(fname);
+
+        int status = ftab_compare(T, T2);
+        ftab_free(T);
+        ftab_free(T2);
+        if(status == 0)
+        {
+            printf("OK! File can be written and read back\n");
+            return EXIT_SUCCESS;
+        } else {
+            printf("Failed to write and read back this file\n");
+            return EXIT_FAILURE;
+        }
+    }
+
     ftab_t * T = ftab_new(4);
     assert(T != NULL);
     printf("T: %zu x %zu\n", T->nrow, T->ncol);
@@ -693,36 +826,17 @@ int ftab_ut(int argc, char ** argv)
     ftab_print(stdout, T, "\t");
 
     /* Save and read */
-    char * fname = calloc(1024, 1);
-    assert(fname != NULL);
-
-
-#ifdef WINDOWS
-    printf("TODO: Windows functionality\n");
-    sprintf(fname, "ftab-random");
-#else
-    sprintf(fname, "/tmp/ftab-XXXXXX");
-    int filedes = mkstemp(fname);
-    close(filedes);
-#endif
+    char * fname = tempfilename();
 
     printf("Temporary file: %s\n", fname);
     ftab_write_tsv(T, fname);
 
 
     ftab_t * T2 = ftab_from_tsv(fname);
-    assert(T2 != NULL);
-    assert(T2->ncol == T->ncol);
-    assert(T2->nrow == T->nrow);
-    for(size_t kk = 0; kk<T->ncol; kk++)
+    int status = ftab_compare(T, T2);
+    if( status != 0 )
     {
-        assert(T->colnames[kk] != NULL);
-        assert(T2->colnames[kk] != NULL);
-        if(strcmp(T->colnames[kk], T2->colnames[kk]))
-        {
-            printf("Error: Header names mismatch: '%s' vs '%s'\n",
-                   T->colnames[kk], T2->colnames[kk]);
-        }
+        printf("Test failed\n");
     }
 
 #ifndef WINDOWS
@@ -732,13 +846,6 @@ int ftab_ut(int argc, char ** argv)
     ftab_print(stdout, T, "\t");
     ftab_free(T);
     ftab_free(T2);
-
-    if(argc > 1)
-    {
-        printf("Reading %s as CSV\n", argv[1]);
-        ftab_t * T = ftab_from_csv(argv[1]);
-        ftab_free(T);
-    }
 
     return EXIT_SUCCESS;
 }

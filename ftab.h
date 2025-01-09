@@ -18,15 +18,32 @@
 
 /* Floating point-only table stored in row-major format.
  * Original repository: github.com/elgw/ftab/
-*/
-
-/* CHANGELOG
+ *
+ * The uggly:
+ *
+ * - Missing values will be parsed as 0
+ * - Always interprets the first line as a header
+ *
+ *
+ * TODO
+ *
+ * Use strtof instead of atof
+ * Possibly support writing using %a for exactness
+ * Decide what to do about missing values
+ * Handle NAN and Inf
+ * Parsing header or not option.
+ * Option to ignoring comment lines starting with #
+ *
+ *
+ * CHANGELOG
+ *
  * 0.1.1 : switched from strtok to strsep to handle also empty values
+ * 0.1.2 : added ftab_compare to compare two tables.
  */
 
 #define FTAB_VERSION_MAJOR 0
 #define FTAB_VERSION_MINOR 1
-#define FTAB_VERSION_PATCH 1
+#define FTAB_VERSION_PATCH 2
 
 #include <stdint.h>
 #include <stdio.h>
@@ -125,6 +142,13 @@ void ftab_subselect_rows(ftab_t * T, const uint8_t * row_selector);
 
 /** Create a deep copy */
 ftab_t * ftab_copy(const ftab_t * T);
+
+/* Compare two tables. Returns 0 if the are equal returns a positive
+* number if either or both pointer are null or if the tables are
+* different
+* Column names are also compared
+*/
+int ftab_compare(const ftab_t *, const ftab_t * );
 
 /* Run some unit tests */
 int ftab_ut(int argc, char ** argv);
