@@ -10,6 +10,10 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
+if(WIN32)
+  add_definitions(-DWINDOWS)
+endif()
+
 
 add_library( ftab ftab.c )
 
