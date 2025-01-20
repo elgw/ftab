@@ -42,6 +42,8 @@ char * strsep(char **sp, char *sep)
     *sp = p;
     return(s);
 }
+
+// https://stackoverflow.com/questions/735126/are-there-alternate-implementations-of-gnu-getline-interface/47229318#47229318
 /* The original code is public domain -- Will Hartung 4/9/09 */
 /* Modifications, public domain as well, by Antti Haapala, 11/10/17
    - Switched to getc on 5/23/19 */
