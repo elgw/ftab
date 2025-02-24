@@ -1,0 +1,8 @@
+// cmake generates ftab_config.h from ftab_config.h.in
+#define FTAB_VERSION_MAJOR "${ftab_VERSION_MAJOR}"
+#define FTAB_VERSION_MINOR "${ftab_VERSION_MINOR}"
+#define FTAB_VERSION_PATCH "${ftab_VERSION_PATCH}"
+#define FTAB_VERSION FTAB_VERSION_MAJOR "."     \
+    FTAB_VERSION_MINOR "."                      \
+    FTAB_VERSION_PATCH
+

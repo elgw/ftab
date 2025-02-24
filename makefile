@@ -1,4 +1,4 @@
-CC=gcc -std=gnu99
+CC=cc -std=gnu99
 
 CFLAGS=-Wall -Wextra -pedantic
 
@@ -22,5 +22,5 @@ endif
 
 FILES=ftab_ut.c ftab.c
 
-ftab_ut: ftab.c
-	$(CC) $(FILES) $(CFLAGS) -o ftab_ut
+ftab_ut: $(FILES)
+	$(CC) $(CFLAGS) $(FILES) $(LDFLAGS) -o ftab_ut
